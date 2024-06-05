@@ -6,17 +6,38 @@ const cors = require("cors");
 app.use(cors());
 app.use(express.json());
 
+//importa o modulo do redis para dentro do projeto
+const redis = require("redis");
+//cria cliente na Redis
+const redisClient = redis.createClient({
+    url: "redis://default:RqpxSR2m9XjGK32LsF1agyCOJ3cuNWwS@redis-16127.c308.sa-east-1-1.ec2.redns.redis-cloud.com:16127",
+    // professor => url: 'redis://default:FKlJHdPumpEa858L0ACF8GBL41dmAQMv@redis-10302.c308.sa-east-1-1.ec2.redns.redis-cloud.com:10302'
+});
+redisClient.on("error", () => {
+    console.log("Erro ao conectar com o Banco de Dados da Redis");
+});
+//conecta ao banco
+redisClient.connect();
+
 // banco de dados em memória
 var clientes = [];
 
 app.get("/listar", (request, response) => {
-    response.json(clientes);
+    let lista = redisClient
+        .get("clientes-mecias")
+        .then((clientes) => {
+            response.json(JSON.parse(clientes));
+        })
+        .catch(() => {
+            response.json([]);
+        });
 });
 
 app.post("/cadastrar", (request, response) => {
     let cliente = request.body;
-    console.log("Cadastrar:", cliente);
+    console.log(cliente);
     clientes.push(cliente); //adiciona o cliente no BD
+    redisClient.set("clientes-mecias", JSON.stringify(clientes));
     response.json({ success: true });
 });
 
@@ -27,7 +48,6 @@ app.delete("/excluir/:cpf", (request, response) => {
         if (cliente.cpf == cpf) {
             //remove o elemento encontrado na posição "i"
             clientes.splice(i, 1);
-            console.log("excluir:", cliente);
         }
     }
     response.json({ success: true });
@@ -40,10 +60,9 @@ app.put("/alterar", (request, response) => {
         if (clientes[i].cpf == cliente.cpf) {
             //substitui os dados do cliente pelos dados enviados pelo front
             clientes[i] = cliente;
-            response.json({ success: true });
-            console.log("Alterar:", cliente);
         }
     }
+    response.json({ success: true });
 });
 
 app.listen(port, () => {
